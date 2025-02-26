@@ -28,6 +28,13 @@ void addVectorsInto(float *result, float *a, float *b, int N){
     }
 }
 
+void addVectorsIntoSerial(float *result, float *a, float *b, int N){
+    int i;
+    for (i=0; i<N; ++i){
+        result[i] = a[i]+b[i];
+    }
+}
+
 void CheckElementsAre(float target, float *array, int N){
     int i;
     for (i=0; i<N;++i){
@@ -46,6 +53,7 @@ int main(){
     float *a;
     float *b;
     float *c;
+    float parallel_execution_time, serial_execution_time;
 
     checkCuda( cudaMallocManaged(&a, size) );
     checkCuda( cudaMallocManaged(&b, size) );
@@ -58,14 +66,34 @@ int main(){
     size_t threadsPerBlock;
     size_t numberOfBlocks;
 
+    cudaEvent_t start_parallel, stop_parallel;
+    cudaEvent_t start_serial, stop_serial;
+    cudaEventCreate(&start_parallel);
+    cudaEventCreate(&stop_parallel);
+    cudaEventCreate(&start_serial);
+    cudaEventCreate(&stop_serial);
+
     threadsPerBlock = 256;
     numberOfBlocks = (N + threadsPerBlock - 1) / threadsPerBlock;
 
+    cudaEventRecord(start_parallel);
     addVectorsInto<<<numberOfBlocks, threadsPerBlock>>>(c, a, b, N);
+    cudaEventRecord(stop_parallel);
+    
     checkCuda( cudaGetLastError() );
-    checkCuda( cudaDeviceSynchronize() );
+    cudaEventSynchronize(stop_parallel);
 
     CheckElementsAre(9, c, N);
+
+    cudaEventRecord(start_serial);
+    addVectorsIntoSerial(c, a, b, N);
+    cudaEventRecord(stop_serial);
+
+
+    cudaEventElapsedTime(&parallel_execution_time, start_parallel, stop_parallel);
+    printf("Parallel Execution time: %f\n", parallel_execution_time);
+    cudaEventElapsedTime(&serial_execution_time, start_serial, stop_serial);
+    printf("Serial Execution time: %f\n", serial_execution_time);
 
     checkCuda( cudaFree(a) );
     checkCuda( cudaFree(b) );
