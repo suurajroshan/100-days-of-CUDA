@@ -88,7 +88,7 @@ int main(){
     cudaEventRecord(start_serial);
     addVectorsIntoSerial(c, a, b, N);
     cudaEventRecord(stop_serial);
-
+    CheckElementsAre(9, c, N);
 
     cudaEventElapsedTime(&parallel_execution_time, start_parallel, stop_parallel);
     printf("Parallel Execution time: %f\n", parallel_execution_time);
