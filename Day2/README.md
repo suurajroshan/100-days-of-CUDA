@@ -20,7 +20,7 @@ NVIDIA GTX1080 comes with up to 8 GB of DRAM, called **global memory**. Global m
 		Number of bytes copied
 		Type/direction of transfer
 
-A kernel function specifies the code to be executed by all threads during a parallel phase. Since all these threads execute the same code, CUDA programming is an instance of the well-known *Single-Program Multiple-Data (SPMD)* parallel programming style. When a program’s host code launches a kernel, the CUDA run-time system generates a grid of threads that are organised into a two-level hierarchy. Each grid is organised as an array of thread blocks, which will be referred to as blocks. All blocks of a grid are of the same size; each block can contain up to 1024 threads.
+A kernel function specifies the code to be executed by all threads during a parallel phase. Since all these threads execute the same code, CUDA programming is an instance of the well-known *Single-Program Multiple-Data (SPMD)* parallel programming style. When a program’s host code launches a kernel, the CUDA run-time system generates a grid of threads that are organised into a two-level hierarchy. Each grid is organised as an array of thread blocks, which will be referred to as blocks. All blocks of a grid are of the same size; each block can contain up to 1024 threads.
 The `__global__` keyword indicates that the function is a kernel and that it can be called from a host function to generate a grid of threads on a device.
 
 | Function Declaration             | Executed on | Callable from |
