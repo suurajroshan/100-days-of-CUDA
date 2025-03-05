@@ -1,18 +1,11 @@
+// Code for naive matrix-matrix multiplication
 // Code from NVIDIA's CUDA course
 
+#pragma once
 #include <stdio.h>
+#include "naiveMatMulGPU.h"
 
 #define N  64
-
-__global__ void matrixMulGPU( int * a, int * b, int * c )
-{
-    int col = threadIdx.x + blockIdx.x * blockDim.x;
-    int row = threadIdx.y + blockIdx.y * blockDim.x;
-    
-    for (int i = 0; i < N; ++i){
-    c[row*N+col] += a[row*N+i]*b[i*N+col];
-    }
-}
 
 /*
  * This CPU function already works, and will run to create a solution matrix
@@ -66,7 +59,6 @@ int main()
                           (N + threads_per_block.y - 1) / threads_per_block.y);
 
   matrixMulGPU <<< number_of_blocks, threads_per_block >>> ( a, b, c_gpu );
-
   cudaDeviceSynchronize();
 
   // Call the CPU version to check our work
@@ -84,6 +76,14 @@ int main()
       }
   if (!error)
     printf("Success!\n");
+
+  // If success then time the kernel
+  // int nIter = 300;
+  // cudaEvent_t NaiveStart, NaiveStop;
+  
+  // for (int n = 0; n < nIter; ++n){
+  //   matrixMulGPU <<< number_of_blocks, threads_per_block >>> ( a, b, c_gpu );
+  // }
 
   // Free all our allocated memory
   cudaFree(a); cudaFree(b);
