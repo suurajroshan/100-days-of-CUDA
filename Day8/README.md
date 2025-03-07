@@ -1,0 +1,3 @@
+# Memory Parallelism Section 5.2 [PMPP](obsidian://open?vault=uni&file=100-days-of-cuda%2FPMPP-3rd-Edition.pdf)
+*Bursting* alone is not sufficient to realise the level of DRAM access bandwidth required by modern processors. DRAM systems s typically employ two more forms of parallel organization – banks and channels. At the highest level, a processor contains one or more channels. Each channel is a memory controller with a bus that connects a set of DRAM banks to the processor. 
+The data transfer bandwidth of a bus is defined by its width and clock frequency. Modern double data rate (DDR) busses perform two data transfers per clock cycle, one at the rising edge and one at the falling edge of each clock cycle.
