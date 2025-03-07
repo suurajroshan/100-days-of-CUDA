@@ -3,94 +3,74 @@
 
 
 #include <stdio.h>
-#include "naiveMatMulGPU.h"
+#include <assert.h>
+#include <cstdlib>
 
-#define N 1024
+#include "multiplicationKernels.h"
+#include "helper_functions.h"
 
-/*
- * This CPU function already works, and will run to create a solution matrix
- * against which to verify your work building out the matrixMulGPU kernel.
- */
-
-void matrixMulCPU( int * a, int * b, int * c )
+int main(int argc, char *argv[])
 {
-  int val = 0;
+  assert(argc==4);
+  int r1 = atoi(argv[1]), r2 = atoi(argv[2]), c2 = atoi(argv[3]);
 
-  for( int row = 0; row < N; ++row )
-    for( int col = 0; col < N; ++col )
-    {
-      val = 0;
-      for ( int k = 0; k < N; ++k )
-        val += a[row * N + k] * b[k * N + col];
-      c[row * N + col] = val;
-    }
-}
+  float *h_a, *d_a, *h_b, *d_b, *h_c, *d_c, *c_check; // Allocate a solution matrix for both the CPU and the GPU operations
+  dim3 dimA(r1,r2), dimB(r2,c2), dimC(r1,c2);
 
-int main()
-{
-  int *a, *b, *c_cpu, *c_gpu; // Allocate a solution matrix for both the CPU and the GPU operations
-
-  int size = N * N * sizeof (int); // Number of bytes of an N x N matrix
+  int memSizeA = dimA.y*dimA.x*sizeof(float);
+  int memSizeB = dimB.y*dimB.x*sizeof(float);
+  int memSizeC = dimC.y*dimC.x*sizeof(float);
 
   // Allocate memory
-  cudaMallocManaged (&a, size);
-  cudaMallocManaged (&b, size);
-  cudaMallocManaged (&c_cpu, size);
-  cudaMallocManaged (&c_gpu, size);
+  cudaMallocHost (&h_a, memSizeA);
+  cudaMallocHost (&h_b, memSizeB);
+  cudaMallocHost (&h_c, memSizeC);
+  cudaMallocHost (&c_check, memSizeC);
+  cudaMalloc (reinterpret_cast<void**>(&d_a), memSizeA);
+  cudaMalloc (reinterpret_cast<void**>(&d_b), memSizeB);
+  cudaMalloc (reinterpret_cast<void**>(&d_c), memSizeC);
 
   // Initialize memory; create 2D matrices
-  for( int row = 0; row < N; ++row )
-    for( int col = 0; col < N; ++col )
-    {
-      a[row*N + col] = row;
-      b[row*N + col] = col+2;
-      c_cpu[row*N + col] = 0;
-      c_gpu[row*N + col] = 0;
-    }
+  InitRandom(h_a, dimA.x*dimA.y);
+  InitRandom(h_b, dimB.x*dimB.y);
+  InitWith(0, h_c, dimC.x*dimC.y);
+  InitWith(0, c_check, dimC.x*dimC.y);
 
-  /*
-   * Assign `threads_per_block` and `number_of_blocks` 2D values
-   * that can be used in matrixMulGPU above.
-   */
+  // copy arrays to device
+  cudaMemcpyAsync(d_a, h_a, memSizeA, cudaMemcpyHostToDevice);
+  cudaMemcpyAsync(d_b, h_b, memSizeB, cudaMemcpyHostToDevice);
+  cudaMemcpyAsync(d_c, h_c, memSizeC, cudaMemcpyHostToDevice);
 
-  int threads = 4;
-  dim3 threads_per_block(threads, threads);
-  dim3 number_of_blocks((N + threads_per_block.x - 1) / threads_per_block.x, 
-                          (N + threads_per_block.y - 1) / threads_per_block.y);
+  // compute result to check
+  matrixMulCPU(h_a, h_b, c_check, dimA, dimB);
 
-  matrixMulGPU <<< number_of_blocks, threads_per_block >>> ( a, b, c_gpu, N );
+  // naive GPU version
+  int threads = 16;
+  dim3 threadsPerBlock(threads, threads);
+  dim3 blocksInGrid( (dimC.x + threadsPerBlock.x -1) / threadsPerBlock.x, 
+                      (dimC.y + threadsPerBlock.y -1) / threadsPerBlock.y);
+  matrixMulGPU<<<threadsPerBlock, blocksInGrid>>>(d_a, d_b, d_c, dimA, dimB );
   cudaDeviceSynchronize();
+  cudaMemcpy(h_c, d_c, memSizeC, cudaMemcpyDeviceToHost);
+  checkMatrices(c_check, h_c, dimC);
 
-  // Call the CPU version to check our work
-  matrixMulCPU( a, b, c_cpu );
-
-  // Compare the two answers to make sure they are equal
-  bool error = false;
-  for( int row = 0; row < N && !error; ++row )
-    for( int col = 0; col < N && !error; ++col )
-      if (c_cpu[row * N + col] != c_gpu[row * N + col])
-      {
-        printf("FOUND ERROR at c[%d][%d]\n", row, col);
-        error = true;
-        break;
-      }
-  if (!error)
-    printf("Success!\n");
-
-  // If success then time the kernel
-  int nIter = 300;
+  // if "success" time the kernel
   cudaEvent_t NaiveStart, NaiveStop;
   cudaEventCreate(&NaiveStart); cudaEventCreate(&NaiveStop);
   cudaEventRecord(NaiveStart);
-  for (int n = 0; n < nIter; ++n){
-    matrixMulGPU <<< number_of_blocks, threads_per_block >>> ( a, b, c_gpu, N );
+  int nIter = 300;
+  for (int iter=0; iter < nIter; ++iter){
+    matrixMulGPU<<<threadsPerBlock, blocksInGrid>>>(d_a, d_b, d_c, dimA, dimB );
   }
   cudaEventRecord(NaiveStop); cudaEventSynchronize(NaiveStop);
-  float msecTotal = 0.0f;
-  cudaEventElapsedTime(&msecTotal, NaiveStart, NaiveStop);
-  float msecPerMatrixMul = msecTotal / nIter;
-  printf("%f\n",msecPerMatrixMul);
-  // Free all our allocated memory
-  cudaFree(a); cudaFree(b);
-  cudaFree( c_cpu ); cudaFree( c_gpu );
+  float NaiveMatMulTime;
+  cudaEventElapsedTime(&NaiveMatMulTime, NaiveStart, NaiveStop);
+  float TimePerNaiveMatMul = NaiveMatMulTime / nIter;
+  printf("Naive Matrix Multplication Time: %f\n", TimePerNaiveMatMul);
+
+  // free allocated memory
+  cudaFree(h_a); cudaFree(d_a); cudaFree(h_b);
+  cudaFree(d_b); cudaFree(h_c); cudaFree(d_c);
+  cudaFree(c_check); cudaEventDestroy(NaiveStart); cudaEventDestroy(NaiveStop);  
+  return 0;
 }
