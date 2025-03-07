@@ -1,4 +1,4 @@
-__global__ void matrixMulGPU( int * a, int * b, int * c )
+__global__ void matrixMulGPU( int * a, int * b, int * c, int N )
 {
     int col = threadIdx.x + blockIdx.x * blockDim.x;
     int row = threadIdx.y + blockIdx.y * blockDim.x;

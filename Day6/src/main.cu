@@ -1,11 +1,11 @@
 // Code for naive matrix-matrix multiplication
 // Code from NVIDIA's CUDA course
 
-#pragma once
+
 #include <stdio.h>
 #include "naiveMatMulGPU.h"
 
-#define N  64
+#define N 1024
 
 /*
  * This CPU function already works, and will run to create a solution matrix
@@ -58,7 +58,7 @@ int main()
   dim3 number_of_blocks((N + threads_per_block.x - 1) / threads_per_block.x, 
                           (N + threads_per_block.y - 1) / threads_per_block.y);
 
-  matrixMulGPU <<< number_of_blocks, threads_per_block >>> ( a, b, c_gpu );
+  matrixMulGPU <<< number_of_blocks, threads_per_block >>> ( a, b, c_gpu, N );
   cudaDeviceSynchronize();
 
   // Call the CPU version to check our work
@@ -78,13 +78,18 @@ int main()
     printf("Success!\n");
 
   // If success then time the kernel
-  // int nIter = 300;
-  // cudaEvent_t NaiveStart, NaiveStop;
-  
-  // for (int n = 0; n < nIter; ++n){
-  //   matrixMulGPU <<< number_of_blocks, threads_per_block >>> ( a, b, c_gpu );
-  // }
-
+  int nIter = 300;
+  cudaEvent_t NaiveStart, NaiveStop;
+  cudaEventCreate(&NaiveStart); cudaEventCreate(&NaiveStop);
+  cudaEventRecord(NaiveStart);
+  for (int n = 0; n < nIter; ++n){
+    matrixMulGPU <<< number_of_blocks, threads_per_block >>> ( a, b, c_gpu, N );
+  }
+  cudaEventRecord(NaiveStop); cudaEventSynchronize(NaiveStop);
+  float msecTotal = 0.0f;
+  cudaEventElapsedTime(&msecTotal, NaiveStart, NaiveStop);
+  float msecPerMatrixMul = msecTotal / nIter;
+  printf("%f\n",msecPerMatrixMul);
   // Free all our allocated memory
   cudaFree(a); cudaFree(b);
   cudaFree( c_cpu ); cudaFree( c_gpu );
